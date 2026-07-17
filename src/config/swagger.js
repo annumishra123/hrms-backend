@@ -12,8 +12,9 @@ const swaggerJSDoc = require('swagger-jsdoc');
  *    Swagger UI on next server restart. No manual spec editing needed.
  */
 
-const PORT = process.env.PORT || 5000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const BASE_URL =
+  process.env.BASE_URL ||
+  "https://hrms-backend-monk.onrender.com";
 
 const swaggerDefinition = {
   openapi: '3.0.0',
