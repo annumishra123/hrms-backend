@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const Counter = require('./Counter');
 
 const userSchema = new mongoose.Schema(
   {
@@ -59,11 +60,25 @@ userSchema.pre('save', async function (next) {
 });
 
 // Auto-generate employeeId if not provided
-userSchema.pre('save', async function (next) {
-  if (this.employeeId) return next();
-  const count = await mongoose.model('User').countDocuments();
-  this.employeeId = `EMP${String(1000 + count + 1).padStart(5, '0')}`;
-  next();
+userSchema.pre("save", async function (next) {
+  try {
+    if (this.employeeId) return next();
+
+    const counter = await Counter.findOneAndUpdate(
+      { _id: "employeeId" },
+      { $inc: { seq: 1 } },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    this.employeeId = `EMP${String(counter.seq).padStart(5, "0")}`;
+
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 userSchema.methods.matchPassword = async function (enteredPassword) {
