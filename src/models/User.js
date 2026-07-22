@@ -109,6 +109,7 @@ userSchema.methods.netSalary = function () {
  *         designation: { type: string, example: Software Developer }
  *         department: { type: string, example: Engineering }
  *         dateOfJoining: { type: string, format: date-time }
+ *         socketId: {type: String, default: null},
  *         leaveBalance:
  *           type: object
  *           properties:
