@@ -44,13 +44,12 @@ router.get('/attendance-trend', ctrl.getAttendanceTrend);
 router.get('/departments', ctrl.getDepartmentBreakdown);
 
 
-
 /**
  * @swagger
  * /admin/deactivate/{userId}:
  *   put:
- *     summary: Deactivate employee
  *     tags: [Admin]
+ *     summary: Deactivate employee
  *     parameters:
  *       - in: path
  *         name: userId
@@ -59,7 +58,7 @@ router.get('/departments', ctrl.getDepartmentBreakdown);
  *           type: string
  *     responses:
  *       200:
- *         description: Deactivate user by admin
+ *         description: User deactivated
  */
 router.put('/deactivate/:userId', ctrl.deactivateUser);
 
