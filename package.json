@@ -8,7 +8,16 @@
     "dev": "nodemon server.js",
     "seed": "node src/utils/seed.js"
   },
-  "keywords": ["hrms", "hr", "attendance", "payroll", "leave", "nodejs", "express", "mongodb"],
+  "keywords": [
+    "hrms",
+    "hr",
+    "attendance",
+    "payroll",
+    "leave",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -23,6 +32,7 @@
     "mongoose": "^8.5.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
+    "socket.io": "^4.8.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1"

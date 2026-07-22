@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const Counter = require('./Counter');
+const Counter = require('../middleware/Counter');
 
 const userSchema = new mongoose.Schema(
   {
@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
     isEmailVerified: { type: Boolean, default: false },
     mfaEnabled: { type: Boolean, default: false },
     otp: { type: String, select: false },
+    socketId: {type: String, default: null},
     otpExpires: { type: Date, select: false },
     leaveBalance: {
       casual: { type: Number, default: 12 },

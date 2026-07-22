@@ -43,6 +43,19 @@ router.get('/attendance-trend', ctrl.getAttendanceTrend);
  */
 router.get('/departments', ctrl.getDepartmentBreakdown);
 
+
+
+/**
+ * @swagger
+ * /admin/deactivate:
+ *   put:
+ *     summary:  Deactivate employee 
+ *     tags: [Admin]
+ *     responses:
+ *       200: { description: Headcount grouped by department }
+ */
+router.put('/deactivate/:userId', ctrl.deactivateUser);
+
 /**
  * @swagger
  * /admin/org-chart:

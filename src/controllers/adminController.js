@@ -2,7 +2,7 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const Leave = require('../models/Leave');
 const { Payroll } = require('../models/Payroll');
-const { asyncHandler } = require('../middleware/errorHandler');
+const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
@@ -83,4 +83,35 @@ exports.getOrgChart = asyncHandler(async (req, res) => {
   });
 
   res.json({ success: true, data: roots });
+});
+
+
+
+exports.deactivateUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  const user = await User.findById(userId).select("+refreshToken");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  user.isActive = false;
+  user.refreshToken = undefined;
+  await user.save();
+  const io = req.app.get("io");
+
+  
+  if (user.socketId) {
+    io.to(user.socketId).emit("force_logout", {
+      message: "Your account has been deactivated by Admin.",
+    });
+    user.socketId = null;
+    await user.save();
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "User deactivated successfully.",
+  });
 });
