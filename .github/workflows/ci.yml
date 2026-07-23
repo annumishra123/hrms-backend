@@ -25,3 +25,14 @@ jobs:
 
       - name: Verify Installation
         run: npm list --depth=0
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Sirf tab chalega jab push seedha 'main' par ho (PR pe nahi)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
