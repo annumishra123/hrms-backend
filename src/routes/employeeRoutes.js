@@ -52,7 +52,7 @@ router.get('/', authorize('hr', 'admin', 'manager'), ctrl.getEmployees);
 
 /**
  * @swagger
- * /employees:
+ * /employees/all-emp:
  *   get:
  *     summary: Get all employees 
  *     tags: [Employees]
