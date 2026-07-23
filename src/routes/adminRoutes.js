@@ -44,6 +44,7 @@ router.get('/attendance-trend', ctrl.getAttendanceTrend);
 router.get('/departments', ctrl.getDepartmentBreakdown);
 
 
+
 /**
  * @swagger
  * /admin/deactivate/{userId}:
@@ -61,6 +62,7 @@ router.get('/departments', ctrl.getDepartmentBreakdown);
  *         description: User deactivated
  */
 router.put('/deactivate/:userId', ctrl.deactivateUser);
+
 
 /**
  * @swagger
