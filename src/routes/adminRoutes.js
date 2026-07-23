@@ -47,10 +47,11 @@ router.get('/departments', ctrl.getDepartmentBreakdown);
 
 /**
  * @swagger
- * /admin/deactivate/{userId}:
+ * /admin/employees/{userId}/deactivate:
  *   put:
  *     tags: [Admin]
- *     summary: Deactivate employee
+ *     summary: Deactivate an employee account (Admin/HR only)
+ *     operationId: adminDeactivateEmployee
  *     parameters:
  *       - in: path
  *         name: userId
@@ -59,7 +60,7 @@ router.get('/departments', ctrl.getDepartmentBreakdown);
  *           type: string
  *     responses:
  *       200:
- *         description: User deactivated
+ *         description: User deactivated successfully
  */
 router.put('/deactivate/:userId', ctrl.deactivateUser);
 
