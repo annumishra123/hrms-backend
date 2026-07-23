@@ -78,3 +78,10 @@ exports.updateSalaryStructure = asyncHandler(async (req, res) => {
   if (!employee) throw new ApiError(404, 'Employee not found');
   res.json({ success: true, message: 'Salary structure updated', data: employee });
 });
+
+
+
+exports.getAllEmployees = asyncHandler(async (req, res) => {
+  const employees = await User.find().select('-password -refreshToken -otp -otpExpires');
+  res.json({ success: true, data: employees})
+});

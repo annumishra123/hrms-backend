@@ -43,6 +43,34 @@ router.use(protect);
  */
 router.get('/', authorize('hr', 'admin', 'manager'), ctrl.getEmployees);
 
+
+
+
+
+
+
+
+/**
+ * @swagger
+ * /employees:
+ *   get:
+ *     summary: Get all employees 
+ *     tags: [Employees]
+ *     responses:
+ *       200:
+ *         description: List of employees
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/User' }
+ */
+router.get('/all-emp', authorize('admin'), ctrl.getAllEmployees);
+
 /**
  * @swagger
  * /employees/{id}:
