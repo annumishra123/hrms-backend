@@ -100,7 +100,6 @@ userSchema.methods.netSalary = function () {
  *     User:
  *       type: object
  *       properties:
- *         _id: { type: string }
  *         employeeId: { type: string, example: EMP01025 }
  *         name: { type: string, example: Anurag Mishra }
  *         email: { type: string, example: anurag@techsoft.com }
@@ -109,7 +108,7 @@ userSchema.methods.netSalary = function () {
  *         designation: { type: string, example: Software Developer }
  *         department: { type: string, example: Engineering }
  *         dateOfJoining: { type: string, format: date-time }
- *         socketId: {type: String, default: null},
+ *         socketId: { type: string, example: socket_abc123 }
  *         leaveBalance:
  *           type: object
  *           properties:
