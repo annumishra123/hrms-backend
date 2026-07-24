@@ -22,9 +22,9 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'User belonging to this token no longer exists' });
     }
 
-    // if (user.isActive === false) {
-    //   return res.status(403).json({ success: false, message: 'Account has been deactivated' });
-    // }
+    if (user.isActive === false) {
+      return res.status(403).json({ success: false, message: 'Account has been deactivated' });
+    }
 
     req.user = user;
     next();

@@ -102,9 +102,9 @@ exports.deactivateUser = asyncHandler(async (req, res) => {
   await user.save();
   const io = req.app.get("io");
 
-  
-  if (user.socketId) {
-    io.to(user.socketId).emit("force_logout", {
+
+  if (!isActive && user.socketId) {
+    io.to(user.socketId).emit("account:deactivated", {
       message: "Your account has been deactivated by Admin.",
     });
     user.socketId = null;
