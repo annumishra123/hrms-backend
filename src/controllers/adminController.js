@@ -88,15 +88,16 @@ exports.getOrgChart = asyncHandler(async (req, res) => {
 
 
 exports.deactivateUser = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-
+   
+  const { userId } = req.params; 
+  const { isActive } = req.body; 
   const user = await User.findById(userId).select("+refreshToken");
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
-  user.isActive = false;
+  user.isActive = isActive;
   user.refreshToken = undefined;
   await user.save();
   const io = req.app.get("io");
@@ -112,6 +113,6 @@ exports.deactivateUser = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: "User deactivated successfully.",
+    message: `User ${isActive ? "activated" : "deactivated"} successfully.`,
   });
 });

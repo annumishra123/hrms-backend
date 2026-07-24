@@ -62,7 +62,7 @@ router.get('/departments', ctrl.getDepartmentBreakdown);
  *       200:
  *         description: User deactivated successfully
  */
-router.put('/deactivate/:userId', ctrl.deactivateUser);
+router.put('/emp-deactivate/:userId', ctrl.deactivateUser);
 
 
 /**
