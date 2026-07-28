@@ -1,15 +1,31 @@
 const mongoose = require('mongoose');
 
 const announcementSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true },
-    message: { type: String, required: true },
-    category: { type: String, enum: ['Company', 'Department', 'Policy', 'Event'], default: 'Company' },
-    postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    pinned: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
+   {
+     title: { type: String, required: true, trim: true },
+     body: { type: String, required: true },
+     category: {
+       type: String,
+       enum: ['Company', 'HR Policy', 'Finance'],
+       default: 'Company',
+     },
+     audience: {
+       type: String,
+       enum: ['All Employees', 'Engineering', 'Management Only'],
+       default: 'All Employees',
+     },
+     postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+ 
+     
+     expiresAt: {
+       type: Date,
+       default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // abhi se 24 ghante baad
+     },
+   },
+   { timestamps: true }
+ );
+ announcementSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 
 const ticketSchema = new mongoose.Schema(
   {

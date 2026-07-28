@@ -3,22 +3,38 @@ const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 
 // ---------- Announcements ----------
 
-exports.createAnnouncement = asyncHandler(async (req, res) => {
-  const announcement = await Announcement.create({ ...req.body, postedBy: req.user._id });
-  res.status(201).json({ success: true, message: 'Announcement published', data: announcement });
-});
-
 exports.getAnnouncements = asyncHandler(async (req, res) => {
-  const { category } = req.query;
-  const query = category ? { category } : {};
-  const announcements = await Announcement.find(query).populate('postedBy', 'name').sort('-pinned -createdAt');
+  const announcements = await Announcement.find({})
+    .populate('postedBy', 'name')
+    .sort('-createdAt');
+
   res.json({ success: true, data: announcements });
 });
 
+exports.createAnnouncement = asyncHandler(async (req, res) => {
+  const { title, body, category, audience } = req.body;
+
+  if (!title || !body) {
+    throw new ApiError(400, 'title and body are required');
+  }
+
+  const announcement = await Announcement.create({
+    title,
+    body,
+    category,
+    audience,
+    postedBy: req.user._id,
+  });
+
+  res.status(201).json({ success: true, message: 'Announcement posted', data: announcement });
+});
+
 exports.deleteAnnouncement = asyncHandler(async (req, res) => {
-  const announcement = await Announcement.findByIdAndDelete(req.params.id);
+  const announcement = await Announcement.findById(req.params.id);
   if (!announcement) throw new ApiError(404, 'Announcement not found');
-  res.json({ success: true, message: 'Announcement removed' });
+
+  await announcement.deleteOne();
+  res.json({ success: true, message: 'Announcement deleted' });
 });
 
 // ---------- Helpdesk Tickets ----------
@@ -61,3 +77,10 @@ exports.updateTicketStatus = asyncHandler(async (req, res) => {
   if (!ticket) throw new ApiError(404, 'Ticket not found');
   res.json({ success: true, message: 'Ticket updated', data: ticket });
 });
+
+
+
+
+
+
+
