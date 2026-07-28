@@ -34,6 +34,13 @@ exports.applyLeave = asyncHandler(async (req, res) => {
     approver: req.user.manager || undefined,
   });
 
+  const populatedLeave =  await leave.populate('employee', 'name employeeId designation profilePhoto');
+  // ---- SOCKET EMIT: Notify all admins about the new leave application
+  const io = req.app.get('io');
+  const admins = await User.find({ role: 'admin', socketId: { $ne: null } });
+  admins.forEach((admin) => {
+    io.to(admin.socketId).emit('leave:new', populatedLeave);
+  });
   res.status(201).json({ success: true, message: 'Leave application submitted', data: leave });
 });
 
@@ -81,6 +88,14 @@ exports.actOnLeave = asyncHandler(async (req, res) => {
       });
     }
   }
+
+  // ---- SOCKET EMIT:
+  const io = req.app.get('io');
+  const employee = await User.findById(leave.employee);
+  if (employee?.socketId) {
+    io.to(employee.socketId).emit('leave:decided', leave);
+  }
+
 
   res.json({ success: true, message: `Leave ${leave.status}`, data: leave });
 });
