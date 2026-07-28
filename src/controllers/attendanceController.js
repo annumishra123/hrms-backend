@@ -1,9 +1,15 @@
 const Attendance = require('../models/Attendance');
+const User = require('../models/User')
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { isWithinGeofence } = require('../utils/geo');
 const { generateQrToken, verifyQrToken } = require('../utils/qr');
 
 const todayStr = () => new Date().toISOString().split('T')[0];
+
+function formatTime(date) {
+  if (!date) return null;
+  return new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 
 async function getOrCreateToday(employeeId) {
   const date = todayStr();
@@ -180,4 +186,57 @@ exports.getEmployeeAttendance = asyncHandler(async (req, res) => {
   }
   const records = await Attendance.find(query).sort('-date');
   res.json({ success: true, data: records });
+});
+
+
+
+exports.getAttendanceOverview = asyncHandler(async (req, res) => {
+  const date = todayStr();
+  const totalEmployees = await User.countDocuments({ role: 'employee' });
+
+  const todayRecords = await Attendance.find({ date }).populate('employee', 'name profilePhoto');
+
+  const present = todayRecords.filter((r) => r.status === 'present').length;
+  const halfDay = todayRecords.filter((r) => r.status === 'half-day').length;
+  const onLeave = todayRecords.filter((r) => r.status === 'leave').length;
+  const holiday = todayRecords.filter((r) => r.status === 'holiday').length;
+  const explicitAbsent = todayRecords.filter((r) => r.status === 'absent').length;
+  const noShow = Math.max(totalEmployees - todayRecords.length, 0);
+  const absent = explicitAbsent + noShow;
+
+  const percentPresent = totalEmployees > 0 ? Math.round((present / totalEmployees) * 100) : 0;
+
+  const today = { present, absent, halfDay, onLeave, percentPresent };
+
+  // ---- Weekly trend: last 7 calendar days ----
+  const trend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dStr = d.toISOString().split('T')[0];
+
+    const dayRecords = await Attendance.find({ date: dStr });
+    const dayPresent = dayRecords.filter((r) => r.status === 'present' || r.status === 'half-day').length;
+    const dayAbsent = Math.max(totalEmployees - dayPresent, 0);
+
+    trend.push({
+      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      present: dayPresent,
+      absent: dayAbsent,
+    });
+  }
+
+  // ---- Today's log ----
+  const log = todayRecords.map((r) => ({
+    id: r._id,
+    name: r.employee?.name || 'Unknown',
+    avatar: r.employee?.profilePhoto || '',
+    checkIn: formatTime(r.checkIn?.time) || '--:--',
+    checkOut: formatTime(r.checkOut?.time) || '--:--',
+    hours: r.workedHours ? `${r.workedHours}h` : '--',
+    mode: r.checkIn?.method || '--',
+    status: r.status,
+  }));
+
+  res.json({ success: true, data: { today, trend, log } });
 });

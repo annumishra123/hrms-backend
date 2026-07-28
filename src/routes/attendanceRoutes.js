@@ -197,5 +197,6 @@ router.get('/me', ctrl.getMyAttendance);
  *       200: { description: Attendance records }
  */
 router.get('/employee/:employeeId', authorize('manager', 'hr', 'admin'), ctrl.getEmployeeAttendance);
+router.get('/overview', authorize('hr', 'admin'), ctrl.getAttendanceOverview);
 
 module.exports = router;
