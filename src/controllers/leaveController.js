@@ -111,3 +111,13 @@ exports.getLeaveCalendar = asyncHandler(async (req, res) => {
 
   res.json({ success: true, data: leaves });
 });
+
+
+
+exports.getAllLeaves = asyncHandler(async (req, res) => {
+  const leaves = await Leave.find({})
+    .populate('employee', 'name employeeId designation profilePhoto')
+    .sort('-createdAt');
+
+  res.json({ success: true, count: leaves.length, data: leaves });
+});

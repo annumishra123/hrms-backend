@@ -109,4 +109,6 @@ router.patch('/:id/action', authorize('manager', 'hr', 'admin'), ctrl.actOnLeave
  */
 router.patch('/:id/cancel', ctrl.cancelLeave);
 
+router.get('/all', protect, ctrl.getAllLeaves);
+
 module.exports = router;
