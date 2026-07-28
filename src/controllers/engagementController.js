@@ -25,7 +25,10 @@ exports.createAnnouncement = asyncHandler(async (req, res) => {
     audience,
     postedBy: req.user._id,
   });
-
+  const populated = await announcement.populate('postedBy', 'name');
+  // ---- SOCKET EMIT
+  const io = req.app.get('io');
+  io.emit('announcement:new', populated);
   res.status(201).json({ success: true, message: 'Announcement posted', data: announcement });
 });
 
@@ -34,6 +37,8 @@ exports.deleteAnnouncement = asyncHandler(async (req, res) => {
   if (!announcement) throw new ApiError(404, 'Announcement not found');
 
   await announcement.deleteOne();
+  const io = req.app.get('io');
+  io.emit('announcement:deleted', { id: req.params.id });
   res.json({ success: true, message: 'Announcement deleted' });
 });
 

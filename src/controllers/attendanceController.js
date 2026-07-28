@@ -8,7 +8,11 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 
 function formatTime(date) {
   if (!date) return null;
-  return new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return new Date(date).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata', 
+  });
 }
 
 async function getOrCreateToday(employeeId) {
