@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { getDevices, removeDevice, logoutAllDevices } = require('../controllers/deviceController');
-const authMiddleware = require('../middleware/auth'); // tumhara existing JWT verify middleware
+const { protect } = require('../middleware/auth');
 
-router.get('/', authMiddleware, getDevices);
-router.delete('/:id', authMiddleware, removeDevice);
-router.post('/logout-all', authMiddleware, logoutAllDevices);
+router.get('/', protect, getDevices);
+router.delete('/:id', protect, removeDevice);
+router.post('/logout-all', protect, logoutAllDevices);
 
 module.exports = router;
