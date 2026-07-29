@@ -153,7 +153,7 @@
 const express = require("express");
 const router = express.Router();
 const payrollController = require("../controllers/payrollController");
-const { protect, authorize } = require("../middleware/authMiddleware");
+const { protect, authorize } = require("../middleware/auth");
 
 router.get("/overview", protect, authorize("hr", "admin"), payrollController.getPayrollOverview);
 router.get("/payslips", protect, authorize("hr", "admin"), payrollController.getPayslips);
