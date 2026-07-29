@@ -199,4 +199,7 @@ router.get('/me', ctrl.getMyAttendance);
 router.get('/employee/:employeeId', authorize('manager', 'hr', 'admin'), ctrl.getEmployeeAttendance);
 router.get('/overview', authorize('hr', 'admin'), ctrl.getAttendanceOverview);
 
+// ── Monthly: date-wise log + per-employee summary
+router.get('/monthly', protect, authorize('manager', 'hr', 'admin'), ctrl.getMonthlyAttendance);
+
 module.exports = router;

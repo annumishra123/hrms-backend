@@ -2,27 +2,10 @@ const Attendance = require('../models/Attendance');
 const User = require('../models/User')
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { isWithinGeofence } = require('../utils/geo');
-const { generateQrToken, verifyQrToken } = require('../utils/qr');
+const { generateQrToken, verifyQrToken,  } = require('../utils/qr');
+const { todayStr, formatTime } = require('../utils/date');
+const { getOrCreateToday } = require('../services/attendanceService');
 
-const todayStr = () => new Date().toISOString().split('T')[0];
-
-function formatTime(date) {
-  if (!date) return null;
-  return new Date(date).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Kolkata', 
-  });
-}
-
-async function getOrCreateToday(employeeId) {
-  const date = todayStr();
-  let record = await Attendance.findOne({ employee: employeeId, date });
-  if (!record) {
-    record = await Attendance.create({ employee: employeeId, date });
-  }
-  return record;
-}
 
 // @desc Generate a fresh QR token to display at the office gate (HR/Admin)
 exports.generateQr = asyncHandler(async (req, res) => {
@@ -243,4 +226,75 @@ exports.getAttendanceOverview = asyncHandler(async (req, res) => {
   }));
 
   res.json({ success: true, data: { today, trend, log } });
+});
+
+
+// @desc Monthly attendance — date-wise log (all employees) + per-employee summary (Manager/HR/Admin)
+exports.getMonthlyAttendance = asyncHandler(async (req, res) => {
+  const { month, year } = req.query;
+  if (!month || !year) throw new ApiError(400, 'month and year are required');
+
+  // "2026-07" jaisa prefix — same pattern jo getMyAttendance mein use hua hai
+  const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+
+  const records = await Attendance.find({ date: { $regex: `^${monthPrefix}` } })
+    .populate('employee', 'name profilePhoto')
+    .sort('-date');
+
+  // (A) DATE-WISE GROUPING — 28 ko kaun aaya, 27 ko kaun
+  const dateMap = {};
+  for (const r of records) {
+    if (!dateMap[r.date]) dateMap[r.date] = [];
+    dateMap[r.date].push({
+      id: r._id,
+      name: r.employee?.name || 'Unknown',
+      avatar: r.employee?.profilePhoto || '',
+      checkIn: formatTime(r.checkIn?.time) || '--:--',
+      checkOut: formatTime(r.checkOut?.time) || '--:--',
+      hours: r.workedHours ? `${r.workedHours}h` : '--',
+      mode: r.checkIn?.method || '--',
+      status: r.status,
+    });
+  }
+
+  const monthlyLog = Object.entries(dateMap)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // latest date sabse upar
+    .map(([date, recs]) => ({ date, records: recs }));
+
+  // (B) PER-EMPLOYEE MONTHLY SUMMARY
+  const employeeMap = {};
+  for (const r of records) {
+    const empId = r.employee?._id?.toString();
+    if (!empId) continue;
+
+    if (!employeeMap[empId]) {
+      employeeMap[empId] = {
+        id: empId,
+        name: r.employee.name,
+        avatar: r.employee.profilePhoto || '',
+        present: 0,
+        absent: 0,
+        halfDay: 0,
+        onLeave: 0,
+        holiday: 0,
+        totalHours: 0,
+      };
+    }
+
+    const bucket = employeeMap[empId];
+    if (r.status === 'present') bucket.present += 1;
+    else if (r.status === 'absent') bucket.absent += 1;
+    else if (r.status === 'half-day') bucket.halfDay += 1;
+    else if (r.status === 'leave') bucket.onLeave += 1;
+    else if (r.status === 'holiday') bucket.holiday += 1;
+
+    if (r.workedHours) bucket.totalHours += r.workedHours;
+  }
+
+  const summary = Object.values(employeeMap).map((e) => ({
+    ...e,
+    totalHours: Math.round(e.totalHours * 10) / 10,
+  }));
+
+  res.json({ success: true, data: { monthlyLog, summary } });
 });
