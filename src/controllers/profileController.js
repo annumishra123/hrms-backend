@@ -5,20 +5,21 @@ const User = require('../models/User');
 /**
  * Helper: Buffer ko Cloudinary pe upload karta hai (stream ke through)
  */
-const uploadToCloudinary = (buffer, folder) => {
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
+const uploadToCloudinary = async (buffer, folder) => {
+  const base64 = buffer.toString("base64");
+  const dataURI = `data:image/jpeg;base64,${base64}`;
+
+  return await cloudinary.uploader.upload(dataURI, {
+    folder,
+    resource_type: "image",
+    transformation: [
       {
-        folder,
-        resource_type: 'image',
-        transformation: [{ width: 500, height: 500, crop: 'fill', gravity: 'face' }],
+        width: 500,
+        height: 500,
+        crop: "fill",
+        gravity: "face",
       },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    );
-    streamifier.createReadStream(buffer).pipe(uploadStream);
+    ],
   });
 };
 
