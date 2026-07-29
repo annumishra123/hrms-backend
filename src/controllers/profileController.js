@@ -5,18 +5,22 @@ const User = require('../models/User');
  * Helper: Buffer ko Cloudinary pe upload karta hai (stream ke through)
  */
 const uploadToCloudinary = async (buffer, folder) => {
-  const base64 = buffer.toString("base64");
+  if (!buffer) {
+    throw new Error('No file buffer received for upload');
+  }
+
+  const base64 = buffer.toString('base64');
   const dataURI = `data:image/jpeg;base64,${base64}`;
 
   return await cloudinary.uploader.upload(dataURI, {
     folder,
-    resource_type: "image",
+    resource_type: 'image',
     transformation: [
       {
         width: 500,
         height: 500,
-        crop: "fill",
-        gravity: "face",
+        crop: 'fill',
+        gravity: 'face',
       },
     ],
   });
@@ -50,6 +54,11 @@ exports.getMyProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    // Debug: dekhte hain kya-kya aa raha hai request mein
+    console.log('---- updateProfile called ----');
+    console.log('Body:', req.body);
+    console.log('File:', req.file ? { fieldname: req.file.fieldname, mimetype: req.file.mimetype, size: req.file.size } : 'No file');
 
     const user = await User.findById(userId).select('+profilePhotoId');
     if (!user) {
@@ -88,7 +97,19 @@ exports.updateProfile = async (req, res) => {
     // ---------- Update text fields ----------
     if (name !== undefined) user.name = name.trim();
     if (phone !== undefined) user.phone = phone;
-    if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth === '') {
+        user.dateOfBirth = null;
+      } else {
+        const parsedDate = new Date(dateOfBirth);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ success: false, message: 'Invalid date of birth format' });
+        }
+        user.dateOfBirth = parsedDate;
+      }
+    }
+
     if (gender !== undefined) user.gender = gender;
     if (address !== undefined) user.address = address;
     if (city !== undefined) user.city = city;
@@ -98,19 +119,28 @@ exports.updateProfile = async (req, res) => {
 
     // ---------- Profile Photo Upload (Cloudinary) ----------
     if (req.file) {
-      // Purani Cloudinary image delete karo (agar hai)
-      if (user.profilePhotoId) {
-        try {
-          await cloudinary.uploader.destroy(user.profilePhotoId);
-        } catch (delErr) {
-          console.warn('Old Cloudinary image delete failed:', delErr.message);
+      try {
+        // Purani Cloudinary image delete karo (agar hai)
+        if (user.profilePhotoId) {
+          try {
+            await cloudinary.uploader.destroy(user.profilePhotoId);
+          } catch (delErr) {
+            console.warn('Old Cloudinary image delete failed:', delErr.message);
+          }
         }
+
+        const result = await uploadToCloudinary(req.file.buffer, 'hr-app/profile-photos');
+
+        user.profilePhoto = result.secure_url;
+        user.profilePhotoId = result.public_id;
+      } catch (uploadErr) {
+        console.error('Cloudinary upload error:', uploadErr);
+        return res.status(500).json({
+          success: false,
+          message: 'Photo upload failed. Please try again.',
+          error: uploadErr.message,
+        });
       }
-
-      const result = await uploadToCloudinary(req.file.buffer, 'hr-app/profile-photos');
-
-      user.profilePhoto = result.secure_url;   // 👈 ye DB me save hoga, frontend seedha isse dikhayega
-      user.profilePhotoId = result.public_id;  // future delete/replace ke liye
     }
 
     await user.save();
@@ -127,6 +157,11 @@ exports.updateProfile = async (req, res) => {
 
     if (err.code === 11000) {
       return res.status(400).json({ success: false, message: 'This email/phone already exists' });
+    }
+
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map((e) => e.message);
+      return res.status(400).json({ success: false, message: messages.join(', ') });
     }
 
     return res.status(500).json({ success: false, message: 'Server error', error: err.message });
