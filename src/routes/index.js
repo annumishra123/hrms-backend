@@ -12,6 +12,8 @@ router.use('/documents', require('./documentRoutes'));
 router.use('/announcements', require('./announcementRoutes'));
 router.use('/helpdesk', require('./helpdeskRoutes'));
 router.use('/admin', require('./adminRoutes'));
+router.use('/devices', require('./deviceRoutes'));
+
 
 /**
  * @swagger
