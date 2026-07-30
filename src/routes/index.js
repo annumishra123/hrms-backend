@@ -14,6 +14,7 @@ router.use('/helpdesk', require('./helpdeskRoutes'));
 router.use('/admin', require('./adminRoutes'));
 router.use('/devices', require('./deviceRoutes'));
 router.use('/profile', require('./profileRoutes'));
+router.use('/holidays', require('./holidayRoutes'));
 
 
 /**
