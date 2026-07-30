@@ -50,7 +50,7 @@ exports.createTicket = asyncHandler(async (req, res) => {
 });
 
 exports.getMyTickets = asyncHandler(async (req, res) => {
-  const tickets = await Ticket.find({raisedBy: req._id}).sort('-createdAt');
+  const tickets = await Ticket.find({raisedBy: req.user._id}).sort('-createdAt');
   res.json({ success: true, data: tickets });
 });
 
