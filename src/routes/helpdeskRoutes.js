@@ -29,7 +29,8 @@ router.use(protect);
  *     responses:
  *       200: { description: List of my tickets }
  */
-router.route('/tickets').post(ctrl.createTicket);
+router.route('/tickets').post(ctrl.createTicket).get(ctrl.getMyTickets);
+router.route('/tickets').get(ctrl.getMyTickets);
 
 /**
  * @swagger
