@@ -74,9 +74,11 @@ exports.addTicketComment = asyncHandler(async (req, res) => {
 });
 
 exports.updateTicketStatus = asyncHandler(async (req, res) => {
-  const { status, assignedTo } = req.body;
-  const ticket = await Ticket.findByIdAndUpdate(req.params.id, { status, assignedTo }, { new: true });
+  const { status } = req.body;
+  const ticket = await Ticket.findByIdAndUpdate(req.params.id, { status }, { new: true })
   if (!ticket) throw new ApiError(404, 'Ticket not found');
+  const io = req.app.get('io');
+  io.emit('ticket:updated', ticket);
   res.json({ success: true, message: 'Ticket updated', data: ticket });
 });
 
