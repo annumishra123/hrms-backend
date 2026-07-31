@@ -1,6 +1,7 @@
 const Leave = require('../models/Leave');
 const User = require('../models/User');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
+const { sendPushToUser } = require('../services/pushNotification.service');
 
 const typeToBalanceKey = { CL: 'casual', EL: 'earned', SL: 'sick', PL: 'privilege' };
 
@@ -79,6 +80,14 @@ exports.actOnLeave = asyncHandler(async (req, res) => {
   leave.approverComment = comment;
   leave.actedAt = new Date();
   await leave.save();
+
+
+  await sendPushToUser(
+    leave.employee,
+    'Leave Approved ✅',
+    `Your leave from ${leave.startDate.toDateString()} has been approved.`,
+    { type: 'leave', leaveId: leave._id.toString() }
+  );
 
   if (action === 'approve') {
     const balanceKey = typeToBalanceKey[leave.leaveType];

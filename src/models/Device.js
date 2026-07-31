@@ -35,6 +35,10 @@ const deviceSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    pushToken: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
