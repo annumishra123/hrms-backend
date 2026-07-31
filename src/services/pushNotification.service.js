@@ -1,56 +1,84 @@
 const { Expo } = require('expo-server-sdk');
 const Device = require('../models/Device');
-const Notification = require('../models/Notification'); 
+const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 const expo = new Expo();
 
 /**
- * Ek user ke saare devices par notification bhejta hai
- * @param {String} userId
- * @param {String} title
- * @param {String} body
- * @param {Object} data - extra info (jaise { type: 'leave', leaveId: '...' })
+ * Ek user ke saare devices par notification bhejta hai (aapka existing function — waisa hi hai)
  */
 async function sendPushToUser(userId, title, body, data = {}) {
-  // Step 1: DB mein history save karo (in-app notification list ke liye)
   console.log('🔔 sendPushToUser called for user:', userId);
-  await Notification.create({ user: userId, title, body, data });
+  const notification = await Notification.create({ user: userId, title, body, data });
   console.log('✅ Notification saved to DB');
 
-  // Step 2: Us user ke saare devices ke push tokens nikalo
   const devices = await Device.find({ user: userId, pushToken: { $ne: null } });
   console.log('🔔 Devices found with pushToken:', devices.length);
-  console.log('🔔 Device tokens:', devices.map(d => d.pushToken));
 
   if (devices.length === 0) {
     console.log('❌ No devices with push token found for this user!');
-    return;
-  }
-
-  const messages = [];
-  for (const device of devices) {
-    if (!Expo.isExpoPushToken(device.pushToken)) {
-      console.log('❌ Invalid Expo push token, skipping:', device.pushToken);
-      continue;
+  } else {
+    const messages = [];
+    for (const device of devices) {
+      if (!Expo.isExpoPushToken(device.pushToken)) {
+        console.log('❌ Invalid Expo push token, skipping:', device.pushToken);
+        continue;
+      }
+      messages.push({ to: device.pushToken, sound: 'default', title, body, data });
     }
-    messages.push({
-      to: device.pushToken,
-      sound: 'default',
-      title,
-      body,
-      data,
-    });
-  }
 
-  // Step 3: Expo ko batches mein bhejo (Expo max 100 per batch allow karta hai)
-  const chunks = expo.chunkPushNotifications(messages);
-  for (const chunk of chunks) {
-    try {
-      await expo.sendPushNotificationsAsync(chunk);
-    } catch (err) {
-      console.error('Push send error:', err);
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try {
+        await expo.sendPushNotificationsAsync(chunk);
+      } catch (err) {
+        console.error('Push send error:', err);
+      }
     }
   }
+
+  return notification;
 }
 
-module.exports = { sendPushToUser };
+/**
+ * 🆕 Real-time socket emit + push, ek specific user ko
+ * @param {Object} io - socket.io instance
+ */
+async function notifyUser(io, userId, title, body, data = {}) {
+  const notification = await sendPushToUser(userId, title, body, data);
+
+  // Real-time socket — user ka current socketId nikaalo
+  const user = await User.findById(userId);
+  if (user?.socketId) {
+    io.to(user.socketId).emit('notification:new', notification);
+    console.log('📡 Real-time notification sent via socket to:', userId);
+  } else {
+    console.log('⚪ User not online (no socketId), only push+DB done');
+  }
+
+  return notification;
+}
+
+/**
+ * 🆕 Saare Admins ko notification bhejo (push + DB + real-time socket)
+ */
+async function notifyAdmins(io, title, body, data = {}) {
+  const admins = await User.find({ role: 'admin' }); // apna exact role field/value confirm kar lo
+  console.log('🔔 Notifying admins, count:', admins.length);
+
+  const results = [];
+  for (const admin of admins) {
+    const notification = await sendPushToUser(admin._id, title, body, data);
+    results.push(notification);
+
+    if (admin.socketId) {
+      io.to(admin.socketId).emit('notification:new', notification);
+      console.log('📡 Real-time sent to admin:', admin._id.toString());
+    }
+  }
+
+  return results;
+}
+
+module.exports = { sendPushToUser, notifyUser, notifyAdmins };

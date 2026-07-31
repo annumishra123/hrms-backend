@@ -1,14 +1,14 @@
 const Leave = require('../models/Leave');
 const User = require('../models/User');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
-const { sendPushToUser } = require('../services/pushNotification.service');
-
+const { sendPushToUser, notifyAdmins } = require('../services/pushNotification.service');
 const typeToBalanceKey = { CL: 'casual', EL: 'earned', SL: 'sick', PL: 'privilege' };
 
 function calcDays(from, to) {
   const ms = new Date(to) - new Date(from);
   return Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
 }
+
 
 // @desc Apply for leave
 exports.applyLeave = asyncHandler(async (req, res) => {
@@ -35,13 +35,27 @@ exports.applyLeave = asyncHandler(async (req, res) => {
     approver: req.user.manager || undefined,
   });
 
-  const populatedLeave =  await leave.populate('employee', 'name employeeId designation profilePhoto');
-  // ---- SOCKET EMIT: Notify all admins about the new leave application
+  const populatedLeave = await leave.populate('employee', 'name employeeId designation profilePhoto');
+
+  // ---- SOCKET EMIT: existing — list ke liye real-time update
   const io = req.app.get('io');
   const admins = await User.find({ role: 'admin', socketId: { $ne: null } });
   admins.forEach((admin) => {
     io.to(admin.socketId).emit('leave:new', populatedLeave);
   });
+
+  // 🆕 ---- PUSH + DB NOTIFICATION: bell icon aur mobile push ke liye
+  await notifyAdmins(
+    io,
+    'New Leave Request',
+    `${req.user.name} has applied for ${leaveType} leave (${numberOfDays} day${numberOfDays > 1 ? 's' : ''})`,
+    {
+      type: 'leave',
+      screen: 'LeaveRequests',
+      leaveId: leave._id.toString(),
+    }
+  );
+
   res.status(201).json({ success: true, message: 'Leave application submitted', data: leave });
 });
 
