@@ -81,6 +81,7 @@ exports.getTeamLeaves = asyncHandler(async (req, res) => {
 });
 
 // @desc Approve or reject a leave request (Manager/HR)
+// @desc Approve or reject a leave request (Manager/HR)
 exports.actOnLeave = asyncHandler(async (req, res) => {  
   const { action, comment } = req.body; // action: 'approve' | 'reject'
   if (!['approve', 'reject'].includes(action)) throw new ApiError(400, "action must be 'approve' or 'reject'");
@@ -95,11 +96,18 @@ exports.actOnLeave = asyncHandler(async (req, res) => {
   leave.actedAt = new Date();
   await leave.save();
 
+  // 🆕 Dynamic title/body based on action
+  const isApproved = action === 'approve';
+  const notifTitle = isApproved ? 'Leave Approved ✅' : 'Leave Rejected ❌';
+  const notifBody = isApproved
+    ? `Your leave from ${leave.fromDate.toDateString()} to ${leave.toDate.toDateString()} has been approved.`
+    : `Your leave from ${leave.fromDate.toDateString()} to ${leave.toDate.toDateString()} has been rejected.${comment ? ` Reason: ${comment}` : ''}`;
+
   await sendPushToUser(
     leave.employee,
-    'Leave Approved ✅',
-    `Your leave from ${leave.fromDate.toDateString()} to ${leave.toDate.toDateString()} has been approved.`,
-    { type: 'leave', leaveId: leave._id.toString() }
+    notifTitle,
+    notifBody,
+    { type: 'leave', status: leave.status, leaveId: leave._id.toString() }
   );
 
   if (action === 'approve') {
@@ -117,7 +125,6 @@ exports.actOnLeave = asyncHandler(async (req, res) => {
   if (employee?.socketId) {
     io.to(employee.socketId).emit('leave:decided', leave);
   }
-
 
   res.json({ success: true, message: `Leave ${leave.status}`, data: leave });
 });
