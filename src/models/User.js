@@ -159,6 +159,15 @@ const userSchema = new mongoose.Schema(
     socketId: { type: String, default: null },
     otpExpires: { type: Date, select: false },
 
+
+    emergencyContacts: [
+      {
+        name: { type: String, required: true },
+        relation: { type: String },
+        phone: { type: String, required: true },
+      },
+    ],
+
     // ================= Personal Information (naya add kiya) =================
     dateOfBirth: { type: Date, default: null },
     gender: { type: String, enum: ['Male', 'Female', 'Other', ''], default: '' },

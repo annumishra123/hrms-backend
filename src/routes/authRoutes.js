@@ -142,5 +142,6 @@ router.get('/me', protect, ctrl.getMe);
  *       200: { description: Logged out successfully }
  */
 router.post('/logout', protect, ctrl.logout);
+router.post("/change-password", protect, ctrl.changePassword);
 
 module.exports = router;
