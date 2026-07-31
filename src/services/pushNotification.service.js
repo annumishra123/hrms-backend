@@ -1,6 +1,6 @@
 const { Expo } = require('expo-server-sdk');
 const Device = require('../models/Device');
-const Notification = require('../models/Notification'); // niche banayenge
+const Notification = require('../models/Notification'); 
 
 const expo = new Expo();
 
