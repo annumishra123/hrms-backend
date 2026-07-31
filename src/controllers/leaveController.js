@@ -81,11 +81,10 @@ exports.actOnLeave = asyncHandler(async (req, res) => {
   leave.actedAt = new Date();
   await leave.save();
 
-
   await sendPushToUser(
     leave.employee,
     'Leave Approved ✅',
-    `Your leave from ${leave.startDate.toDateString()} has been approved.`,
+    `Your leave from ${leave.fromDate.toDateString()} to ${leave.toDate.toDateString()} has been approved.`,
     { type: 'leave', leaveId: leave._id.toString() }
   );
 
