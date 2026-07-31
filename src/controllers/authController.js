@@ -175,36 +175,25 @@ function sanitize(user) {
   return obj;
 }
 
+// @desc Change password (logged-in user)
+exports.changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
 
-
-// POST /api/auth/change-password
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: "Current and new password is required " });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: "New password min 8 characters" });
-    }
-
-    const user = await User.findById(req.user._id).select("+password");
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: "Current password is  worng" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    await user.save();
-
-    res.json({ success: true, message: "Password successfully update " });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, 'Current and new password are required');
   }
-};
+  if (newPassword.length < 8) {
+    throw new ApiError(400, 'New password must be at least 8 characters');
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+  if (!user) throw new ApiError(404, 'User not found');
+
+  const isMatch = await user.matchPassword(currentPassword);
+  if (!isMatch) throw new ApiError(401, 'Current password is incorrect');
+
+  user.password = newPassword;
+  await user.save();
+
+  res.json({ success: true, message: 'Password updated successfully' });
+});
