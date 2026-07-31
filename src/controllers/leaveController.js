@@ -67,7 +67,7 @@ exports.getTeamLeaves = asyncHandler(async (req, res) => {
 });
 
 // @desc Approve or reject a leave request (Manager/HR)
-exports.actOnLeave = asyncHandler(async (req, res) => {
+exports.actOnLeave = asyncHandler(async (req, res) => {  
   const { action, comment } = req.body; // action: 'approve' | 'reject'
   if (!['approve', 'reject'].includes(action)) throw new ApiError(400, "action must be 'approve' or 'reject'");
 
