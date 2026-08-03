@@ -40,7 +40,7 @@ exports.gpsCheckIn = asyncHandler(async (req, res) => {
   const { lat, lng } = req.body;
   if (lat === undefined || lng === undefined) throw new ApiError(400, 'lat and lng are required');
 
-  const { withinGeofence, distance } = isWithinGeofence(lat, lng);
+  const { withinGeofence, distance } = await isWithinGeofence(lat, lng);
   if (!withinGeofence) {
     throw new ApiError(403, `You are ${distance}m away from office. Must be within allowed radius to check in.`);
   }
@@ -86,7 +86,7 @@ exports.faceCheckIn = asyncHandler(async (req, res) => {
 // @desc Check-out (any method)
 exports.checkOut = asyncHandler(async (req, res) => {
   const { method = 'manual', lat, lng } = req.body;
-  const record = await Attendance.findOne({ employee: req.user._id, date: todayStr() });
+  const record = await Attendance.findOne({ eisWithinGeofencemployee: req.user._id, date: todayStr() });
   if (!record || !record.checkIn?.time) throw new ApiError(400, 'You must check in before checking out');
   if (record.checkOut?.time) throw new ApiError(409, 'Already checked out today');
 
