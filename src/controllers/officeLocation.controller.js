@@ -20,20 +20,26 @@ exports.setOfficeLocation = async (req, res) => {
   try {
     const { name, address, lat, lng, radiusMeters, restrictionEnabled } = req.body;
 
-    if (lat === undefined || lng === undefined) {
-      return res.status(400).json({ success: false, message: "Latitude and longitude is required " });
-    }
-
-    // Ek hi document maintain karna hai, isliye upsert use kar rahe hain
     let office = await OfficeLocation.findOne();
+
+    // NAYA: lat/lng ko sirf tab parse/update karo jab valid number ban rahe hon
+    const parsedLat = lat !== undefined && lat !== "" ? parseFloat(lat) : undefined;
+    const parsedLng = lng !== undefined && lng !== "" ? parseFloat(lng) : undefined;
+
+    // Agar naya document bana rahe hain (pehli baar), tabhi lat/lng required hain
+    if (!office && (parsedLat === undefined || parsedLng === undefined || isNaN(parsedLat) || isNaN(parsedLng))) {
+      return res.status(400).json({ success: false, message: "Latitude aur longitude required hain" });
+    }
 
     if (office) {
       office.name = name ?? office.name;
       office.address = address ?? office.address;
-      office.lat = parseFloat(lat);
-      office.lng = parseFloat(lng);
+
+      // NAYA: sirf valid value ho tabhi update karo, warna purani value rakho
+      if (parsedLat !== undefined && !isNaN(parsedLat)) office.lat = parsedLat;
+      if (parsedLng !== undefined && !isNaN(parsedLng)) office.lng = parsedLng;
+
       office.radiusMeters = radiusMeters ? parseFloat(radiusMeters) : office.radiusMeters;
-      // NAYA: agar body me restrictionEnabled bheja gaya hai to use update karo, warna existing value rakho
       office.restrictionEnabled =
         restrictionEnabled !== undefined ? Boolean(restrictionEnabled) : office.restrictionEnabled;
       office.updatedBy = req.user?._id;
@@ -42,8 +48,8 @@ exports.setOfficeLocation = async (req, res) => {
       office = await OfficeLocation.create({
         name,
         address,
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
+        lat: parsedLat,
+        lng: parsedLng,
         radiusMeters: radiusMeters ? parseFloat(radiusMeters) : 20,
         restrictionEnabled: restrictionEnabled !== undefined ? Boolean(restrictionEnabled) : true,
         updatedBy: req.user?._id,
