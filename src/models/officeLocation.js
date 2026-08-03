@@ -6,6 +6,7 @@ const officeLocationSchema = new mongoose.Schema(
     address: { type: String, default: "" },
     lat: { type: Number, required: true },
     lng: { type: Number, required: true },
+    restrictionEnabled: { type: Boolean, default: true },
     radiusMeters: { type: Number, required: true, default: 20 },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },

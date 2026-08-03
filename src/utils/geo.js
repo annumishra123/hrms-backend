@@ -1,4 +1,4 @@
-const Office = require('../models/officeLocation');
+const OfficeLocation = require('../models/officeLocation');
 
 /**
  * Haversine formula - distance between two lat/lng points in meters.
@@ -16,10 +16,22 @@ function distanceInMeters(lat1, lng1, lat2, lng2) {
 }
 
 async function isWithinGeofence(lat, lng) {
-  const office = await Office.findOne(); // agar multiple offices hain to filter/id use karo
+  // Har request pe fresh DB se office fetch — isliye toggle real-time kaam karta hai
+  const office = await OfficeLocation.findOne().sort({ updatedAt: -1 });
 
   if (!office) {
     throw new Error('Office location not configured');
+  }
+
+  // NAYA: agar restriction OFF hai, to koi bhi location allow — distance calculate karke sirf info ke liye return karo
+  if (office.restrictionEnabled === false) {
+    const officeLat = Number(office.lat);
+    const officeLng = Number(office.lng);
+    const distance = !isNaN(officeLat) && !isNaN(officeLng)
+      ? Math.round(distanceInMeters(lat, lng, officeLat, officeLng))
+      : null;
+
+    return { withinGeofence: true, distance, restrictionEnabled: false };
   }
 
   const officeLat = Number(office.lat);
@@ -30,8 +42,9 @@ async function isWithinGeofence(lat, lng) {
     throw new Error('Office location has invalid coordinates');
   }
 
-  const distance = distanceInMeters(lat, lng, officeLat, officeLng);
-  return { withinGeofence: distance <= radius, distance: Math.round(distance) };
+  const distance = Math.round(distanceInMeters(lat, lng, officeLat, officeLng));
+
+  return { withinGeofence: distance <= radius, distance, restrictionEnabled: true };
 }
 
 module.exports = { distanceInMeters, isWithinGeofence };
