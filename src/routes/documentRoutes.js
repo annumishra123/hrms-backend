@@ -58,7 +58,7 @@ router.delete('/:id', ctrl.deleteDocument);
  *     responses:
  *       200: { description: Digital ID card details }
  */
-router.get('/id-card', ctrl.getDigitalIdCard);
+router.get('/digital-id', ctrl.getDigitalIdCard);
 
 /**
  * @swagger

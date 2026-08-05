@@ -10,6 +10,8 @@ const documentSchema = new mongoose.Schema(
     },
     fileName: { type: String, required: true },
     fileUrl: { type: String, required: true },
+    cloudinaryPublicId: { type: String },
+    resourceType: { type: String, default: 'image' },
     expiryDate: { type: Date },
     uploadedOn: { type: Date, default: Date.now },
   },
