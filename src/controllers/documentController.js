@@ -7,7 +7,15 @@ const { uploadToCloudinary, deleteFromCloudinary } = require('../services/upload
 // @route POST /api/documents
 // ─────────────────────────────────────────────
 exports.uploadDocument = asyncHandler(async (req, res) => {
+
   if (!req.file) throw new ApiError(400, 'No file uploaded');
+
+  if (!req.file.buffer) {
+    throw new ApiError(
+      500,
+      'File buffer missing — server upload middleware misconfigured (expected memoryStorage)'
+    );
+  }
 
   const { docType, expiryDate } = req.body;
 
