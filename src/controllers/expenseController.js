@@ -54,7 +54,7 @@ exports.createExpense = asyncHandler(async (req, res) => {
 
   const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
-  const expense = await Expense.create({
+  let expense = await Expense.create({
     employee: req.user._id,
     title,
     amount: Number(amount),
@@ -63,6 +63,14 @@ exports.createExpense = asyncHandler(async (req, res) => {
     notes: notes || '',
     imageUrl,
   });
+
+  expense = await expense.populate('employee', 'name email');
+
+  // 🔴 REALTIME EMIT — admins ko naya expense turant dikhe
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admins').emit('expense:new', expense);
+  }
 
   res.status(201).json({ success: true, message: 'Expense submitted for approval', data: expense });
 });
@@ -91,7 +99,16 @@ exports.updateExpense = asyncHandler(async (req, res) => {
   if (req.file) expense.imageUrl = `/uploads/${req.file.filename}`;
 
   await expense.save();
-  res.json({ success: true, message: 'Expense updated', data: expense });
+  const populated = await expense.populate('employee', 'name email');
+
+  // 🔴 REALTIME EMIT
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admins').emit('expense:updated', populated);
+    io.to(`user:${populated.employee._id}`).emit('expense:updated', populated);
+  }
+
+  res.json({ success: true, message: 'Expense updated', data: populated });
 });
 
 // ─────────────────────────────────────────────
@@ -116,7 +133,16 @@ exports.updateExpenseStatus = asyncHandler(async (req, res) => {
   expense.reviewNote = reviewNote || '';
   await expense.save();
 
-  res.json({ success: true, message: `Expense ${status.toLowerCase()}`, data: expense });
+  const populated = await expense.populate('employee', 'name email');
+
+  // 🔴 REALTIME EMIT — employee ko turant status change dikhega
+  const io = req.app.get('io');
+  if (io) {
+    io.to(`user:${populated.employee._id}`).emit('expense:statusChanged', populated);
+    io.to('admins').emit('expense:updated', populated);
+  }
+
+  res.json({ success: true, message: `Expense ${status.toLowerCase()}`, data: populated });
 });
 
 // ─────────────────────────────────────────────
@@ -135,8 +161,18 @@ exports.deleteExpense = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Only pending expenses can be deleted');
   }
 
+  const employeeId = expense.employee;
+  const expenseId = expense._id;
   await expense.deleteOne();
-  res.json({ success: true, message: 'Expense deleted', data: { id: req.params.id } });
+
+  // 🔴 REALTIME EMIT
+  const io = req.app.get('io');
+  if (io) {
+    io.to('admins').emit('expense:deleted', { id: expenseId });
+    io.to(`user:${employeeId}`).emit('expense:deleted', { id: expenseId });
+  }
+
+  res.json({ success: true, message: 'Expense deleted', data: { id: expenseId } });
 });
 
 // ─────────────────────────────────────────────
