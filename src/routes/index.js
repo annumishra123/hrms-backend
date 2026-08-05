@@ -18,6 +18,8 @@ router.use('/emergency', require('./emergencyContactRoutes'));
 router.use('/holidays', require('./holidayRoutes'));
 router.use('/location', require('./officeLocationRoutes'));
 router.use('/', require('./notificationRoutes'));
+router.use('/expense', require('./expenseRoutes'));
+
 
 
 
