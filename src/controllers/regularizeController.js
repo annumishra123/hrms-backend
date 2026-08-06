@@ -64,12 +64,16 @@ exports.getMyRegularizeRequests = async (req, res) => {
 // ---------- Admin: saari pending (ya sab) requests dekho ----------
 exports.getAllRegularizeRequests = async (req, res) => {
   try {
+    console.log("Admin fetching all regularize requests...");
+    
     const { status } = req.query; // ?status=pending  (optional filter)
     const filter = status ? { status } : {};
 
     const requests = await RegularizeRequest.find(filter)
       .sort({ createdAt: -1 })
       .populate('employee', 'name employeeId department profileImage');
+      console.log(requests,"data here...");
+      
 
     return res.status(200).json({ success: true, data: requests });
   } catch (err) {
