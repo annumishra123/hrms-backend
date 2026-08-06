@@ -77,6 +77,7 @@ exports.getAllRegularizeRequests = async (req, res) => {
 
     return res.status(200).json({ success: true, data: requests });
   } catch (err) {
+    console.error('getAllRegularizeRequests error:', err); 
     return res.status(500).json({ success: false, message: 'Request could not be loaded' });
   }
 };
