@@ -7,7 +7,7 @@ const { protect, authorize } = require('../middleware/auth');
 router.use(protect);
 
 router.post('/', ctrl.submitRegularizeRequest);
-router.get('/', ctrl.getMyRegularizeRequests);
+router.get('/my', ctrl.getMyRegularizeRequests);
 
 
 // for admin
