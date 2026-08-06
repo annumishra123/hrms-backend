@@ -451,4 +451,4 @@ exports.rejectRegularizeRequest = async (req, res) => {
     console.error('rejectRegularizeRequest error:', err);
     return res.status(500).json({ success: false, message: 'Failed to reject the request.' });
   }
-};g
+};
