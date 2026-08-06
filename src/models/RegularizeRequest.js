@@ -26,7 +26,7 @@ const regularizeRequestSchema = new mongoose.Schema(
       default: 'pending',
     },
 
-    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     managerComment: { type: String, default: null },
     reviewedAt: { type: Date, default: null },
   },
