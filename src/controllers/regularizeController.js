@@ -58,19 +58,6 @@ exports.getMyRegularizeRequests = async (req, res) => {
   }
 };
 
-// ---------- Employee: specific date ka actual attendance record dekho ----------
-exports.getAttendanceByDate = async (req, res) => {
-  try {
-    const employeeId = req.user._id;
-    const { date } = req.params;
-
-    const record = await Attendance.findOne({ employee: employeeId, date });
-
-    return res.status(200).json({ success: true, data: record || null });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Attendance request could not be loaded' });
-  }
-};
 
 
 

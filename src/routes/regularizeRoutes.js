@@ -8,7 +8,6 @@ router.use(protect);
 
 router.post('/', ctrl.submitRegularizeRequest);
 router.get('/', ctrl.getMyRegularizeRequests);
-router.get('/../attendance/date/:date', ctrl.getAttendanceByDate);
 
 
 // for admin
