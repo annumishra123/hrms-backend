@@ -18,7 +18,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     checkOut: {
       time: { type: Date },
-      method: { type: String, enum: ['qr', 'gps', 'face', 'manual'] },
+      method: { type: String, enum: ['qr', 'gps', 'face', 'manual', 'regularized'] },
       location: {
         lat: { type: Number },
         lng: { type: Number },
