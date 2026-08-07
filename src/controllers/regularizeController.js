@@ -329,12 +329,17 @@ exports.getRegularizeRequestById = async (req, res) => {
 
 // ---------- Admin: request ko APPROVE karo ----------
 exports.approveRegularizeRequest = async (req, res) => {
+  console.log("Admin approving regularize request...");
+  
   try {
     const adminId = req.user._id;
     const { id } = req.params;
     const { managerComment } = req.body;
+    console.log("Request ID:", req);
 
     const request = await RegularizeRequest.findById(id);
+    console.log("Found request:", request);
+    
     if (!request) {
       return res.status(404).json({ success: false, message: 'Request not found.' });
     }
@@ -347,7 +352,8 @@ exports.approveRegularizeRequest = async (req, res) => {
       employee: request.employee,
       date: request.date,
     });
-
+    console.log("Found attendance record:", attendance);
+    
     if (!attendance) {
       // Agar us din ka koi record hi nahi tha (jaise poora din absent tha), naya bana do
       attendance = new Attendance({
