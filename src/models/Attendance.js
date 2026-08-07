@@ -6,7 +6,7 @@ const attendanceSchema = new mongoose.Schema(
     date: { type: String, required: true, index: true }, // YYYY-MM-DD for easy per-day lookup
     checkIn: {
       time: { type: Date },
-      method: { type: String, enum: ['qr', 'gps', 'face', 'manual'], default: 'manual' },
+      method: { type: String, enum: ['qr', 'gps', 'face','regularized', 'manual'], default: 'manual' },
       location: {
         lat: { type: Number },
         lng: { type: Number },
