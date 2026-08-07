@@ -123,7 +123,7 @@ exports.approveRegularizeRequest = async (req, res) => {
     const adminId = req.user._id;
     const { id } = req.params;
     const { managerComment } = req.body;
-    console.log("Request ID:", req);
+    console.log("Request ID:", id);
 
     const request = await RegularizeRequest.findById(id);
     console.log("Found request:", request);
@@ -151,18 +151,20 @@ exports.approveRegularizeRequest = async (req, res) => {
       });
     }
 
-    // Requested time ko actual attendance mein daal do
+    // Requested time ko actual attendance mein daal do (IST offset ke saath, taaki timezone lag na ho)
     if (request.requestedCheckInTime) {
       const [h, m] = request.requestedCheckInTime.split(':').map(Number);
-      const checkInDate = new Date(request.date);
-      checkInDate.setHours(h, m, 0, 0);
+      const checkInDate = new Date(
+        `${request.date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+05:30`
+      );
       attendance.checkIn = { time: checkInDate, method: 'regularized' };
     }
 
     if (request.requestedCheckOutTime) {
       const [h, m] = request.requestedCheckOutTime.split(':').map(Number);
-      const checkOutDate = new Date(request.date);
-      checkOutDate.setHours(h, m, 0, 0);
+      const checkOutDate = new Date(
+        `${request.date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+05:30`
+      );
       attendance.checkOut = { time: checkOutDate, method: 'regularized' };
     }
 
@@ -202,7 +204,6 @@ exports.approveRegularizeRequest = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to approve the request.' });
   }
 };
-
 // ---------- Admin: request ko REJECT karo ----------
 exports.rejectRegularizeRequest = async (req, res) => {
   try {
