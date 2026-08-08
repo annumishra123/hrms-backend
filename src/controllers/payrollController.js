@@ -4,13 +4,22 @@ const PayrollRun = require("../models/PayrollRun");
 const Attendance = require("../models/Attendance");
 
 // ---------- date helpers: date field String "YYYY-MM-DD" hai ----------
+
+
+// ---------- date helpers ----------
 const pad2 = (n) => String(n).padStart(2, "0");
 
 function getMonthDateRange(month, year) {
-  const totalDays = new Date(year, month, 0).getDate(); // month ke total din
+  const totalDays = new Date(year, month, 0).getDate();
   const startDate = `${year}-${pad2(month)}-01`;
   const endDate = `${year}-${pad2(month)}-${pad2(totalDays)}`;
   return { startDate, endDate, totalDays };
+}
+
+// Sunday=0, Saturday=6 — weekend check
+function isWeekend(dateStr) {
+  const day = new Date(dateStr).getDay();
+  return day === 0 || day === 6;
 }
 
 // ---------- ek employee ka ek month ka attendance summary ----------
@@ -19,25 +28,44 @@ async function getAttendanceSummary(userId, month, year) {
 
   const records = await Attendance.find({
     employee: userId,
-    date: { $gte: startDate, $lte: endDate }, // string comparison, YYYY-MM-DD format me sahi chalta hai
+    date: { $gte: startDate, $lte: endDate },
   });
+
+  // Quick lookup: date string -> status
+  const recordMap = {};
+  records.forEach((r) => { recordMap[r.date] = r.status; });
 
   let presentDays = 0;
   let paidLeaveDays = 0;
   let holidayDays = 0;
+  let weekendDays = 0;
+  let lopDays = 0;
 
-  records.forEach((r) => {
-    if (r.status === "present") presentDays += 1;
-    else if (r.status === "half-day") presentDays += 0.5;
-    else if (r.status === "leave") paidLeaveDays += 1;
-    else if (r.status === "holiday") holidayDays += 1;
-    // "absent" ya koi record na hone par kuch add nahi hota — LOP ban jaata hai
-  });
+  for (let d = 1; d <= totalDays; d++) {
+    const dateStr = `${year}-${pad2(month)}-${pad2(d)}`;
+    const status = recordMap[dateStr];
+    const weekend = isWeekend(dateStr);
 
-  const payableDays = presentDays + paidLeaveDays + holidayDays;
-  const lopDays = Math.max(0, totalDays - payableDays);
+    if (status === "present") {
+      presentDays += 1;
+    } else if (status === "half-day") {
+      presentDays += 0.5;
+    } else if (status === "leave") {
+      paidLeaveDays += 1;
+    } else if (status === "holiday") {
+      holidayDays += 1;
+    } else if (weekend) {
+      // Record hi nahi bana, lekin weekend hai — paid maana jaayega
+      weekendDays += 1;
+    } else {
+      // Weekday hai aur "absent" ya koi record nahi — LOP
+      lopDays += 1;
+    }
+  }
 
-  return { totalDays, presentDays, paidLeaveDays, holidayDays, payableDays, lopDays };
+  const payableDays = presentDays + paidLeaveDays + holidayDays + weekendDays;
+
+  return { totalDays, presentDays, paidLeaveDays, holidayDays, weekendDays, payableDays, lopDays };
 }
 
 // ---------- attendance ke hisab se salary calculate karo ----------
