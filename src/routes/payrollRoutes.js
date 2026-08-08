@@ -150,12 +150,19 @@
 // module.exports = router;
 
 
+
+
+
+
 const express = require("express");
 const router = express.Router();
-const payrollController = require("../controllers/payrollController");
+const ctrl = require("../controllers/payrollController");
 const { protect, authorize } = require("../middleware/auth");
 
-router.get("/overview", protect, authorize("hr", "admin"), payrollController.getPayrollOverview);
-router.get("/payslips", protect, authorize("hr", "admin"), payrollController.getPayslips);
+router.get("/overview", protect, authorize("hr", "admin"), ctrl.getPayrollOverview);
+router.get("/payslips", protect, authorize("hr", "admin"), ctrl.getPayslips);
+router.post("/run", protect, authorize("hr", "admin"), ctrl.startPayrollRun);
+router.get("/run/:runId/status", protect, authorize("hr", "admin"), ctrl.getRunStatus);
+router.post("/run/:runId/retry", protect, authorize("hr", "admin"), ctrl.retryFailedRun);
 
 module.exports = router;
