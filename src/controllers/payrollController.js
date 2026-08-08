@@ -407,6 +407,7 @@ exports.getMyPayroll = async (req, res) => {
 };
 
 
+
 // ---------- GET /payroll/me/pdf — apni salary slip PDF download karo ----------
 exports.downloadMyPayslipPDF = async (req, res) => {
   try {
@@ -419,7 +420,6 @@ exports.downloadMyPayslipPDF = async (req, res) => {
       return res.status(404).json({ message: "User nahi mila" });
     }
 
-    // Pehle processed payslip check karo, warna live calculate karo
     let payslip = await Payslip.findOne({ employee: req.user._id, month, year });
 
     let salaryData;
@@ -444,81 +444,149 @@ exports.downloadMyPayslipPDF = async (req, res) => {
     const grossEarnings = salaryData.basic + salaryData.hra + salaryData.special + salaryData.other;
     const totalDeductions = salaryData.pf + salaryData.tax;
 
-    // ---------- PDF banao ----------
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=Payslip_${monthLabel.replace(" ", "_")}.pdf`
     );
-
     doc.pipe(res);
 
-    // Header
-    doc.fontSize(18).font("Helvetica-Bold").text("Salary Slip", { align: "center" });
-    doc.fontSize(11).font("Helvetica").fillColor("#666").text(monthLabel, { align: "center" });
-    doc.moveDown(1.5);
-    doc.fillColor("#000");
+    const PAGE_WIDTH = 595.28; // A4 width in points
+    const MARGIN = 45;
+    const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
-    // Employee Info
-    doc.fontSize(12).font("Helvetica-Bold").text("Employee Details");
-    doc.moveDown(0.3);
-    doc.fontSize(10).font("Helvetica");
-    doc.text(`Name: ${user.name || "-"}`);
-    doc.text(`Employee ID: ${user.employeeId || "-"}`);
-    doc.text(`Designation: ${user.designation || "-"}`);
-    doc.moveDown(1);
+    const PRIMARY = "#2563EB";
+    const DARK = "#1F2937";
+    const MUTED = "#6B7280";
+    const LIGHT_BG = "#F3F4F6";
+    const GREEN = "#16A34A";
+    const RED = "#DC2626";
+    const BORDER = "#E5E7EB";
 
-    // Attendance summary
-    doc.fontSize(12).font("Helvetica-Bold").text("Attendance Summary");
-    doc.moveDown(0.3);
-    doc.fontSize(10).font("Helvetica");
-    doc.text(`Total Days: ${attendanceData.totalDays}`);
-    doc.text(`Present Days: ${attendanceData.presentDays}`);
-    doc.text(`Paid Leave Days: ${attendanceData.paidLeaveDays}`);
-    doc.text(`LOP Days: ${attendanceData.lopDays}`);
-    doc.text(`Payable Days: ${attendanceData.payableDays}`);
-    doc.moveDown(1);
+    // ===== Header band =====
+    doc.rect(0, 0, PAGE_WIDTH, 90).fill(PRIMARY);
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(20)
+      .text("Home Dev Tech Pvt. Ltd.", MARGIN, 28);
+    doc.font("Helvetica").fontSize(10).fillColor("#DBEAFE")
+      .text("Salary Slip", MARGIN, 54);
+    doc.fontSize(10).fillColor("#DBEAFE")
+      .text(monthLabel, MARGIN, 54, { align: "right", width: CONTENT_WIDTH });
 
-    // Earnings table
-    doc.fontSize(12).font("Helvetica-Bold").text("Earnings");
-    doc.moveDown(0.3);
-    doc.fontSize(10).font("Helvetica");
-    drawRow(doc, "Basic", salaryData.basic);
-    drawRow(doc, "HRA", salaryData.hra);
-    drawRow(doc, "Special Allowance", salaryData.special);
-    drawRow(doc, "Other Allowance", salaryData.other);
-    doc.moveDown(0.3);
-    doc.font("Helvetica-Bold");
-    drawRow(doc, "Gross Earnings", grossEarnings);
-    doc.font("Helvetica");
-    doc.moveDown(1);
+    let y = 115;
 
-    // Deductions table
-    doc.fontSize(12).font("Helvetica-Bold").text("Deductions");
-    doc.moveDown(0.3);
-    doc.fontSize(10).font("Helvetica");
-    drawRow(doc, "Provident Fund", salaryData.pf);
-    drawRow(doc, "Professional Tax", salaryData.tax);
-    doc.moveDown(0.3);
-    doc.font("Helvetica-Bold");
-    drawRow(doc, "Total Deductions", totalDeductions);
-    doc.font("Helvetica");
-    doc.moveDown(1);
+    // ===== Employee info box =====
+    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 80, 6).fill(LIGHT_BG);
+    const colW = CONTENT_WIDTH / 2;
+    const infoY = y + 14;
 
-    // Net pay
-    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#ccc").stroke();
-    doc.moveDown(0.5);
-    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1a7f37");
-    doc.text(`Net Pay: Rs. ${salaryData.net.toLocaleString("en-IN")}`, { align: "right" });
-    doc.fillColor("#000");
+    doc.fillColor(MUTED).font("Helvetica").fontSize(8).text("EMPLOYEE NAME", MARGIN + 16, infoY);
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11).text(user.name || "-", MARGIN + 16, infoY + 12);
 
-    doc.moveDown(2);
-    doc.fontSize(8).font("Helvetica").fillColor("#999").text(
-      "This is a system-generated payslip and does not require a signature.",
-      { align: "center" }
-    );
+    doc.fillColor(MUTED).font("Helvetica").fontSize(8).text("EMPLOYEE ID", MARGIN + 16 + colW, infoY);
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11).text(user.employeeId || "-", MARGIN + 16 + colW, infoY + 12);
+
+    doc.fillColor(MUTED).font("Helvetica").fontSize(8).text("DESIGNATION", MARGIN + 16, infoY + 38);
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11).text(user.designation || "-", MARGIN + 16, infoY + 50);
+
+    doc.fillColor(MUTED).font("Helvetica").fontSize(8).text("PAY PERIOD", MARGIN + 16 + colW, infoY + 38);
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(11).text(monthLabel, MARGIN + 16 + colW, infoY + 50);
+
+    y += 100;
+
+    // ===== Attendance summary strip =====
+    const attendanceItems = [
+      { label: "Total Days", value: attendanceData.totalDays },
+      { label: "Present", value: attendanceData.presentDays },
+      { label: "Paid Leave", value: attendanceData.paidLeaveDays },
+      { label: "LOP", value: attendanceData.lopDays },
+      { label: "Payable Days", value: attendanceData.payableDays },
+    ];
+    const stripItemW = CONTENT_WIDTH / attendanceItems.length;
+    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 46, 6).strokeColor(BORDER).lineWidth(1).stroke();
+    attendanceItems.forEach((item, i) => {
+      const x = MARGIN + i * stripItemW;
+      doc.fillColor(MUTED).font("Helvetica").fontSize(7.5)
+        .text(item.label.toUpperCase(), x, y + 10, { width: stripItemW, align: "center" });
+      doc.fillColor(DARK).font("Helvetica-Bold").fontSize(13)
+        .text(String(item.value), x, y + 23, { width: stripItemW, align: "center" });
+    });
+
+    y += 70;
+
+    // ===== Earnings & Deductions side by side =====
+    const tableW = (CONTENT_WIDTH - 20) / 2;
+
+    function drawSectionTable(startX, title, rows, total, totalLabel, accentColor) {
+      let ty = y;
+      doc.font("Helvetica-Bold").fontSize(11).fillColor(DARK).text(title, startX, ty);
+      ty += 20;
+
+      doc.rect(startX, ty, tableW, rows.length * 24 + 34).strokeColor(BORDER).lineWidth(1).stroke();
+
+      rows.forEach((row, i) => {
+        const rowY = ty + i * 24;
+        if (i > 0) {
+          doc.moveTo(startX, rowY).lineTo(startX + tableW, rowY).strokeColor(BORDER).lineWidth(0.5).stroke();
+        }
+        doc.font("Helvetica").fontSize(9.5).fillColor(DARK)
+          .text(row.label, startX + 12, rowY + 7, { width: tableW - 100 });
+        doc.font("Helvetica").fontSize(9.5).fillColor(DARK)
+          .text(`Rs. ${(row.value || 0).toLocaleString("en-IN")}`, startX + 12, rowY + 7, {
+            width: tableW - 24, align: "right",
+          });
+      });
+
+      // total row
+      const totalY = ty + rows.length * 24;
+      doc.rect(startX, totalY, tableW, 34).fill(LIGHT_BG);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(DARK)
+        .text(totalLabel, startX + 12, totalY + 10, { width: tableW - 100 });
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(accentColor)
+        .text(`Rs. ${(total || 0).toLocaleString("en-IN")}`, startX + 12, totalY + 10, {
+          width: tableW - 24, align: "right",
+        });
+
+      return ty + rows.length * 24 + 34;
+    }
+
+    const earningsRows = [
+      { label: "Basic", value: salaryData.basic },
+      { label: "HRA", value: salaryData.hra },
+      { label: "Special Allowance", value: salaryData.special },
+      { label: "Other Allowance", value: salaryData.other },
+    ];
+    const deductionsRows = [
+      { label: "Provident Fund", value: salaryData.pf },
+      { label: "Professional Tax", value: salaryData.tax },
+    ];
+
+    const leftBottom = drawSectionTable(MARGIN, "Earnings", earningsRows, grossEarnings, "Gross Earnings", GREEN);
+    const rightBottom = drawSectionTable(MARGIN + tableW + 20, "Deductions", deductionsRows, totalDeductions, "Total Deductions", RED);
+
+    y = Math.max(leftBottom, rightBottom) + 30;
+
+    // ===== Net Pay box =====
+    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 54, 6).fill(PRIMARY);
+    doc.fillColor("#DBEAFE").font("Helvetica").fontSize(10)
+      .text("NET PAY", MARGIN + 20, y + 12);
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(20)
+      .text(`Rs. ${(salaryData.net || 0).toLocaleString("en-IN")}`, MARGIN, y + 26, {
+        width: CONTENT_WIDTH - 20, align: "right",
+      });
+
+    y += 80;
+
+    // ===== Footer =====
+    doc.fontSize(8).font("Helvetica").fillColor(MUTED)
+      .text("This is a system-generated payslip and does not require a signature.", MARGIN, y, {
+        width: CONTENT_WIDTH, align: "center",
+      });
+    doc.fontSize(8).fillColor(MUTED)
+      .text(`Generated on ${new Date().toLocaleDateString("en-IN")}`, MARGIN, y + 14, {
+        width: CONTENT_WIDTH, align: "center",
+      });
 
     doc.end();
   } catch (err) {
@@ -526,11 +594,3 @@ exports.downloadMyPayslipPDF = async (req, res) => {
     res.status(500).json({ message: "Payslip PDF generate karne me error aaya", error: err.message });
   }
 };
-
-// helper: label-value row (right aligned amount)
-function drawRow(doc, label, value) {
-  const y = doc.y;
-  doc.text(label, 50, y);
-  doc.text(`Rs. ${(value || 0).toLocaleString("en-IN")}`, 50, y, { align: "right", width: 495 });
-  doc.moveDown(0.4);
-}
