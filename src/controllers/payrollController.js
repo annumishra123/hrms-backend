@@ -333,3 +333,73 @@ exports.updateSalaryStructure = async (req, res) => {
     res.status(500).json({ message: "Salary update nahi ho paayi", error: err.message });
   }
 };
+
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// ---------- GET /payroll/me — logged-in employee ki khud ki salary ----------
+exports.getMyPayroll = async (req, res) => {
+  try {
+    const now = new Date();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
+    const year = parseInt(req.query.year) || now.getFullYear();
+
+    // 1) Pehle check karo ki HR ne is month ka payslip already process kiya hai ya nahi
+    let payslip = await Payslip.findOne({ employee: req.user._id, month, year });
+
+    // 2) Agar payslip nahi bana, to live attendance + salary se calculate kar do
+    if (!payslip) {
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({ message: "User nahi mila" });
+      }
+
+      const attendance = await getAttendanceSummary(user._id, month, year);
+      const salary = buildSalarySnapshot(user, attendance);
+
+      payslip = {
+        basic: salary.basic,
+        hra: salary.hra,
+        special: salary.special,
+        other: salary.other,
+        pf: salary.pf,
+        tax: salary.tax,
+        net: salary.net,
+        totalDays: attendance.totalDays,
+        presentDays: attendance.presentDays,
+        paidLeaveDays: attendance.paidLeaveDays,
+        lopDays: attendance.lopDays,
+        payableDays: attendance.payableDays,
+      };
+    }
+
+    const earnings = [
+      { label: "Basic", value: payslip.basic || 0 },
+      { label: "HRA", value: payslip.hra || 0 },
+      { label: "Special Allowance", value: payslip.special || 0 },
+      { label: "Other Allowance", value: payslip.other || 0 },
+    ].filter((e) => e.value > 0);
+
+    const deductions = [
+      { label: "Provident Fund", value: payslip.pf || 0 },
+      { label: "Professional Tax", value: payslip.tax || 0 },
+    ].filter((d) => d.value > 0);
+
+    res.status(200).json({
+      data: {
+        month: `${MONTH_NAMES[month - 1]} ${year}`,
+        takeHome: payslip.net || 0,
+        earnings,
+        deductions,
+        totalDays: payslip.totalDays,
+        presentDays: payslip.presentDays,
+        paidLeaveDays: payslip.paidLeaveDays,
+        lopDays: payslip.lopDays,
+        payableDays: payslip.payableDays,
+      },
+    });
+  } catch (err) {
+    console.error("getMyPayroll error:", err);
+    res.status(500).json({ message: "Payroll error", error: err.message });
+  }
+};

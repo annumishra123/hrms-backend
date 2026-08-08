@@ -159,6 +159,9 @@ const router = express.Router();
 const ctrl = require("../controllers/payrollController");
 const { protect, authorize } = require("../middleware/auth");
 
+router.get("/me", protect, ctrl.getMyPayroll);
+
+
 router.get("/overview", protect, authorize("hr", "admin"), ctrl.getPayrollOverview);
 router.get("/payslips", protect, authorize("hr", "admin"), ctrl.getPayslips);
 router.post("/run", protect, authorize("hr", "admin"), ctrl.startPayrollRun);
