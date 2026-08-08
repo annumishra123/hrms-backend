@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const payslipSchema = new mongoose.Schema(
   {
-    employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
+    employee: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     empId: { type: String, required: true },
     name: { type: String, required: true },
     designation: { type: String },
@@ -18,6 +18,12 @@ const payslipSchema = new mongoose.Schema(
     pf: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
     net: { type: Number, default: 0 },
+    // Attendance summary 
+    totalDays: { type: Number, default: 0 },
+    presentDays: { type: Number, default: 0 },
+    paidLeaveDays: { type: Number, default: 0 },
+    lopDays: { type: Number, default: 0 },
+    payableDays: { type: Number, default: 0 },
 
     status: {
       type: String,
