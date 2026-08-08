@@ -1,10 +1,47 @@
-const User = require("../models/User"); 
-const Payslip = require("../models/Payroll");
+const User = require("../models/User");
+const Payslip = require("../models/Payslip");
 const PayrollRun = require("../models/PayrollRun");
+const Attendance = require("../models/Attendance");
 
-// ---------- helper: User.salary se net pay calculate karo ----------
-// User model me already netSalary() method hai, hum wahi use karenge
-const buildSalarySnapshot = (user) => {
+// ---------- date helpers: date field String "YYYY-MM-DD" hai ----------
+const pad2 = (n) => String(n).padStart(2, "0");
+
+function getMonthDateRange(month, year) {
+  const totalDays = new Date(year, month, 0).getDate(); // month ke total din
+  const startDate = `${year}-${pad2(month)}-01`;
+  const endDate = `${year}-${pad2(month)}-${pad2(totalDays)}`;
+  return { startDate, endDate, totalDays };
+}
+
+// ---------- ek employee ka ek month ka attendance summary ----------
+async function getAttendanceSummary(userId, month, year) {
+  const { startDate, endDate, totalDays } = getMonthDateRange(month, year);
+
+  const records = await Attendance.find({
+    employee: userId,
+    date: { $gte: startDate, $lte: endDate }, // string comparison, YYYY-MM-DD format me sahi chalta hai
+  });
+
+  let presentDays = 0;
+  let paidLeaveDays = 0;
+  let holidayDays = 0;
+
+  records.forEach((r) => {
+    if (r.status === "present") presentDays += 1;
+    else if (r.status === "half-day") presentDays += 0.5;
+    else if (r.status === "leave") paidLeaveDays += 1;
+    else if (r.status === "holiday") holidayDays += 1;
+    // "absent" ya koi record na hone par kuch add nahi hota — LOP ban jaata hai
+  });
+
+  const payableDays = presentDays + paidLeaveDays + holidayDays;
+  const lopDays = Math.max(0, totalDays - payableDays);
+
+  return { totalDays, presentDays, paidLeaveDays, holidayDays, payableDays, lopDays };
+}
+
+// ---------- attendance ke hisab se salary calculate karo ----------
+function buildSalarySnapshot(user, attendance) {
   const s = user.salary || {};
   const basic = s.basic || 0;
   const hra = s.hra || 0;
@@ -12,9 +49,22 @@ const buildSalarySnapshot = (user) => {
   const other = s.otherAllowance || 0;
   const pf = s.pf || 0;
   const tax = s.professionalTax || 0;
-  const net = user.netSalary(); // model ka existing method use kiya
-  return { basic, hra, special, other, pf, tax, net };
-};
+
+  const grossMonthly = basic + hra + special + other;
+  const perDayRate = attendance.totalDays > 0 ? grossMonthly / attendance.totalDays : 0;
+
+  // Payable gross = per-day rate x (present + paid leave + holiday days)
+  const payableGross = +(perDayRate * attendance.payableDays).toFixed(2);
+
+  // PF/Professional Tax fixed hi kaate jaate hain (poora mahina), sirf earnings pro-rate hoti hain
+  const net = +(payableGross - pf - tax).toFixed(2);
+
+  return {
+    basic, hra, special, other, pf, tax,
+    perDayRate: +perDayRate.toFixed(2),
+    net,
+  };
+}
 
 // ---------- GET /payroll/overview ----------
 exports.getPayrollOverview = async (req, res) => {
@@ -23,17 +73,13 @@ exports.getPayrollOverview = async (req, res) => {
     const year = parseInt(req.query.year);
 
     const payslips = await Payslip.find({ month, year });
-    // Sirf employees (role != admin/hr agar chaho to yahan filter kar sakte ho)
     const totalEmployees = await User.countDocuments({ isActive: true });
 
     if (payslips.length === 0) {
       return res.status(200).json({
         summary: {
-          totalPayroll: 0,
-          employeesPaid: 0,
-          totalEmployees,
-          pending: totalEmployees,
-          avgSalary: 0,
+          totalPayroll: 0, employeesPaid: 0, totalEmployees,
+          pending: totalEmployees, avgSalary: 0,
         },
         trend: await getLast6MonthsTrend(month, year),
       });
@@ -54,24 +100,19 @@ exports.getPayrollOverview = async (req, res) => {
     });
   } catch (err) {
     console.error("getPayrollOverview error:", err);
-    res.status(500).json({ message: "Payroll overview fetch  error ", error: err.message });
+    res.status(500).json({ message: "Payroll overview fetch karne me error aaya", error: err.message });
   }
 };
 
 async function getLast6MonthsTrend(month, year) {
   const trend = [];
   const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-  let m = month;
-  let y = year;
+  let m = month, y = year;
   for (let i = 5; i >= 0; i--) {
-    let tm = m - i;
-    let ty = y;
+    let tm = m - i, ty = y;
     if (tm <= 0) { tm += 12; ty -= 1; }
-
     const slips = await Payslip.find({ month: tm, year: ty });
     const total = slips.reduce((sum, p) => sum + p.net, 0);
-
     trend.push({ month: MONTH_NAMES[tm - 1], amount: +(total / 10000000).toFixed(2) });
   }
   return trend;
@@ -81,7 +122,6 @@ async function getLast6MonthsTrend(month, year) {
 exports.getPayslips = async (req, res) => {
   try {
     const { page = 1, limit = 25, search = "", status = "", month, year } = req.query;
-
     const filter = { month: parseInt(month), year: parseInt(year) };
     if (status) filter.status = status;
     if (search) {
@@ -93,21 +133,15 @@ exports.getPayslips = async (req, res) => {
 
     const totalCount = await Payslip.countDocuments(filter);
     const totalPages = Math.max(1, Math.ceil(totalCount / limit));
-
     const payslips = await Payslip.find(filter)
       .sort({ name: 1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
 
-    res.status(200).json({
-      payslips,
-      totalCount,
-      totalPages,
-      currentPage: parseInt(page),
-    });
+    res.status(200).json({ payslips, totalCount, totalPages, currentPage: parseInt(page) });
   } catch (err) {
     console.error("getPayslips error:", err);
-    res.status(500).json({ message: "Payslips fetch  error ", error: err.message });
+    res.status(500).json({ message: "Payslips fetch karne me error aaya", error: err.message });
   }
 };
 
@@ -115,29 +149,19 @@ exports.getPayslips = async (req, res) => {
 exports.startPayrollRun = async (req, res) => {
   try {
     const { month, year } = req.body;
-
-    // Sirf active employees ka payroll banega. Agar HR/Admin ko exclude karna ho
-    // to yahan role: { $nin: ["hr", "admin"] } add kar sakte ho.
     const employees = await User.find({ isActive: true });
 
     if (employees.length === 0) {
-      return res.status(400).json({ message: "No active employee " });
+      return res.status(400).json({ message: "Koi active employee nahi mila" });
     }
 
     const run = await PayrollRun.create({
-      month,
-      year,
-      status: "queued",
-      total: employees.length,
-      processed: 0,
+      month, year, status: "queued",
+      total: employees.length, processed: 0,
       createdBy: req.user?._id,
     });
 
-    res.status(200).json({
-      runId: run._id,
-      status: run.status,
-      totalEmployees: employees.length,
-    });
+    res.status(200).json({ runId: run._id, status: run.status, totalEmployees: employees.length });
 
     processPayrollRun(run._id, employees, month, year);
   } catch (err) {
@@ -146,7 +170,7 @@ exports.startPayrollRun = async (req, res) => {
   }
 };
 
-// ---------- background me har employee ka payslip banata hai ----------
+// ---------- background: har employee ka attendance-based payslip banao ----------
 async function processPayrollRun(runId, employees, month, year) {
   await PayrollRun.findByIdAndUpdate(runId, { status: "processing" });
 
@@ -155,7 +179,8 @@ async function processPayrollRun(runId, employees, month, year) {
 
   for (const user of employees) {
     try {
-      const { basic, hra, special, other, pf, tax, net } = buildSalarySnapshot(user);
+      const attendance = await getAttendanceSummary(user._id, month, year);
+      const salary = buildSalarySnapshot(user, attendance);
 
       await Payslip.findOneAndUpdate(
         { employee: user._id, month, year },
@@ -165,15 +190,13 @@ async function processPayrollRun(runId, employees, month, year) {
           name: user.name,
           designation: user.designation,
           avatar: user.profilePhoto,
-          month,
-          year,
-          basic,
-          hra,
-          special,
-          other,
-          pf,
-          tax,
-          net,
+          month, year,
+          ...salary,
+          totalDays: attendance.totalDays,
+          presentDays: attendance.presentDays,
+          paidLeaveDays: attendance.paidLeaveDays,
+          lopDays: attendance.lopDays,
+          payableDays: attendance.payableDays,
           status: "processed",
           runId,
         },
@@ -184,17 +207,12 @@ async function processPayrollRun(runId, employees, month, year) {
     }
 
     processed++;
-
     if (processed % 10 === 0 || processed === employees.length) {
       await PayrollRun.findByIdAndUpdate(runId, { processed, errors });
     }
   }
 
-  await PayrollRun.findByIdAndUpdate(runId, {
-    status: "completed",
-    processed,
-    errors,
-  });
+  await PayrollRun.findByIdAndUpdate(runId, { status: "completed", processed, errors });
 }
 
 // ---------- GET /payroll/run/:runId/status ----------
@@ -202,13 +220,7 @@ exports.getRunStatus = async (req, res) => {
   try {
     const run = await PayrollRun.findById(req.params.runId);
     if (!run) return res.status(404).json({ message: "Run nahi mila" });
-
-    res.status(200).json({
-      status: run.status,
-      processed: run.processed,
-      total: run.total,
-      errors: run.errors,
-    });
+    res.status(200).json({ status: run.status, processed: run.processed, total: run.total, errors: run.errors });
   } catch (err) {
     console.error("getRunStatus error:", err);
     res.status(500).json({ message: "Run status fetch karne me error aaya", error: err.message });
@@ -220,7 +232,6 @@ exports.retryFailedRun = async (req, res) => {
   try {
     const oldRun = await PayrollRun.findById(req.params.runId);
     if (!oldRun) return res.status(404).json({ message: "Run nahi mila" });
-
     if (!oldRun.errors || oldRun.errors.length === 0) {
       return res.status(400).json({ message: "Koi failed employee nahi hai retry karne ke liye" });
     }
@@ -229,23 +240,68 @@ exports.retryFailedRun = async (req, res) => {
     const employees = await User.find({ employeeId: { $in: failedEmpIds } });
 
     const newRun = await PayrollRun.create({
-      month: oldRun.month,
-      year: oldRun.year,
-      status: "queued",
-      total: employees.length,
-      processed: 0,
-      createdBy: req.user?._id,
+      month: oldRun.month, year: oldRun.year, status: "queued",
+      total: employees.length, processed: 0, createdBy: req.user?._id,
     });
 
-    res.status(200).json({
-      runId: newRun._id,
-      status: newRun.status,
-      totalEmployees: employees.length,
-    });
-
+    res.status(200).json({ runId: newRun._id, status: newRun.status, totalEmployees: employees.length });
     processPayrollRun(newRun._id, employees, oldRun.month, oldRun.year);
   } catch (err) {
     console.error("retryFailedRun error:", err);
     res.status(500).json({ message: "Retry start nahi ho paaya", error: err.message });
+  }
+};
+
+// ---------- GET /payroll/salary-structure ----------
+exports.getSalaryStructure = async (req, res) => {
+  try {
+    const { page = 1, limit = 25, search = "" } = req.query;
+    const filter = { isActive: true };
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { employeeId: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const totalCount = await User.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+    const employees = await User.find(filter)
+      .select("employeeId name designation profilePhoto salary")
+      .sort({ name: 1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    res.status(200).json({ employees, totalCount, totalPages, currentPage: parseInt(page) });
+  } catch (err) {
+    console.error("getSalaryStructure error:", err);
+    res.status(500).json({ message: "Salary structure fetch karne me error aaya", error: err.message });
+  }
+};
+
+// ---------- PUT /payroll/salary-structure/:userId ----------
+exports.updateSalaryStructure = async (req, res) => {
+  try {
+    const { basic, hra, specialAllowance, otherAllowance, pf, professionalTax } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      {
+        salary: {
+          basic: basic || 0,
+          hra: hra || 0,
+          specialAllowance: specialAllowance || 0,
+          otherAllowance: otherAllowance || 0,
+          pf: pf || 0,
+          professionalTax: professionalTax || 0,
+        },
+      },
+      { new: true }
+    ).select("employeeId name salary");
+
+    if (!user) return res.status(404).json({ message: "Employee nahi mila" });
+    res.status(200).json({ message: "Salary update ho gayi", employee: user });
+  } catch (err) {
+    console.error("updateSalaryStructure error:", err);
+    res.status(500).json({ message: "Salary update nahi ho paayi", error: err.message });
   }
 };
