@@ -2,6 +2,8 @@ const User = require("../models/User");
 const Payslip = require("../models/Payroll");
 const PayrollRun = require("../models/PayrollRun");
 const Attendance = require("../models/Attendance");
+const PDFDocument = require("pdfkit");
+
 
 // ---------- date helpers: date field String "YYYY-MM-DD" hai ----------
 
@@ -403,3 +405,132 @@ exports.getMyPayroll = async (req, res) => {
     res.status(500).json({ message: "Payroll error", error: err.message });
   }
 };
+
+
+// ---------- GET /payroll/me/pdf — apni salary slip PDF download karo ----------
+exports.downloadMyPayslipPDF = async (req, res) => {
+  try {
+    const now = new Date();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
+    const year = parseInt(req.query.year) || now.getFullYear();
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User nahi mila" });
+    }
+
+    // Pehle processed payslip check karo, warna live calculate karo
+    let payslip = await Payslip.findOne({ employee: req.user._id, month, year });
+
+    let salaryData;
+    let attendanceData;
+
+    if (payslip) {
+      salaryData = {
+        basic: payslip.basic, hra: payslip.hra, special: payslip.special,
+        other: payslip.other, pf: payslip.pf, tax: payslip.tax, net: payslip.net,
+      };
+      attendanceData = {
+        totalDays: payslip.totalDays, presentDays: payslip.presentDays,
+        paidLeaveDays: payslip.paidLeaveDays, lopDays: payslip.lopDays,
+        payableDays: payslip.payableDays,
+      };
+    } else {
+      attendanceData = await getAttendanceSummary(user._id, month, year);
+      salaryData = buildSalarySnapshot(user, attendanceData);
+    }
+
+    const monthLabel = `${MONTH_NAMES[month - 1]} ${year}`;
+    const grossEarnings = salaryData.basic + salaryData.hra + salaryData.special + salaryData.other;
+    const totalDeductions = salaryData.pf + salaryData.tax;
+
+    // ---------- PDF banao ----------
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Payslip_${monthLabel.replace(" ", "_")}.pdf`
+    );
+
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(18).font("Helvetica-Bold").text("Salary Slip", { align: "center" });
+    doc.fontSize(11).font("Helvetica").fillColor("#666").text(monthLabel, { align: "center" });
+    doc.moveDown(1.5);
+    doc.fillColor("#000");
+
+    // Employee Info
+    doc.fontSize(12).font("Helvetica-Bold").text("Employee Details");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`Name: ${user.name || "-"}`);
+    doc.text(`Employee ID: ${user.employeeId || "-"}`);
+    doc.text(`Designation: ${user.designation || "-"}`);
+    doc.moveDown(1);
+
+    // Attendance summary
+    doc.fontSize(12).font("Helvetica-Bold").text("Attendance Summary");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    doc.text(`Total Days: ${attendanceData.totalDays}`);
+    doc.text(`Present Days: ${attendanceData.presentDays}`);
+    doc.text(`Paid Leave Days: ${attendanceData.paidLeaveDays}`);
+    doc.text(`LOP Days: ${attendanceData.lopDays}`);
+    doc.text(`Payable Days: ${attendanceData.payableDays}`);
+    doc.moveDown(1);
+
+    // Earnings table
+    doc.fontSize(12).font("Helvetica-Bold").text("Earnings");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    drawRow(doc, "Basic", salaryData.basic);
+    drawRow(doc, "HRA", salaryData.hra);
+    drawRow(doc, "Special Allowance", salaryData.special);
+    drawRow(doc, "Other Allowance", salaryData.other);
+    doc.moveDown(0.3);
+    doc.font("Helvetica-Bold");
+    drawRow(doc, "Gross Earnings", grossEarnings);
+    doc.font("Helvetica");
+    doc.moveDown(1);
+
+    // Deductions table
+    doc.fontSize(12).font("Helvetica-Bold").text("Deductions");
+    doc.moveDown(0.3);
+    doc.fontSize(10).font("Helvetica");
+    drawRow(doc, "Provident Fund", salaryData.pf);
+    drawRow(doc, "Professional Tax", salaryData.tax);
+    doc.moveDown(0.3);
+    doc.font("Helvetica-Bold");
+    drawRow(doc, "Total Deductions", totalDeductions);
+    doc.font("Helvetica");
+    doc.moveDown(1);
+
+    // Net pay
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#ccc").stroke();
+    doc.moveDown(0.5);
+    doc.fontSize(13).font("Helvetica-Bold").fillColor("#1a7f37");
+    doc.text(`Net Pay: Rs. ${salaryData.net.toLocaleString("en-IN")}`, { align: "right" });
+    doc.fillColor("#000");
+
+    doc.moveDown(2);
+    doc.fontSize(8).font("Helvetica").fillColor("#999").text(
+      "This is a system-generated payslip and does not require a signature.",
+      { align: "center" }
+    );
+
+    doc.end();
+  } catch (err) {
+    console.error("downloadMyPayslipPDF error:", err);
+    res.status(500).json({ message: "Payslip PDF generate karne me error aaya", error: err.message });
+  }
+};
+
+// helper: label-value row (right aligned amount)
+function drawRow(doc, label, value) {
+  const y = doc.y;
+  doc.text(label, 50, y);
+  doc.text(`Rs. ${(value || 0).toLocaleString("en-IN")}`, 50, y, { align: "right", width: 495 });
+  doc.moveDown(0.4);
+}

@@ -82,6 +82,6 @@ exports.updateSalaryStructure = asyncHandler(async (req, res) => {
 
 
 exports.getAllEmployees = asyncHandler(async (req, res) => {
-  const employees = await User.find().select('-password -refreshToken -otp -otpExpires');
+  const employees = await User.find({role: {$ne: 'admin'}}).select('-password -refreshToken -otp -otpExpires');
   res.json({ success: true, data: employees})
 });

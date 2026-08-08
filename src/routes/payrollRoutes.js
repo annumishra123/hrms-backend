@@ -160,6 +160,7 @@ const ctrl = require("../controllers/payrollController");
 const { protect, authorize } = require("../middleware/auth");
 
 router.get("/me", protect, ctrl.getMyPayroll);
+router.get("/me/pdf", protect, ctrl.downloadMyPayslipPDF);
 
 
 router.get("/overview", protect, authorize("hr", "admin"), ctrl.getPayrollOverview);
